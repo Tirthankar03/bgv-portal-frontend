@@ -3,6 +3,7 @@ import api from '@/services/axios';
 export interface ValidateEmployeePayload {
   employeeId: string;
   name: string;
+  entityName?: string;
 }
 
 export interface ValidateEmployeeResponse {
