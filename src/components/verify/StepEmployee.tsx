@@ -20,7 +20,7 @@ const VERIFICATION_COMPANIES = [
 ];
 
 const schema = z.object({
-  entityName: z.string().min(1, 'Select an entity'),
+  entityName: z.string().optional(),
   verifyingForCompany: z.string().optional(),
   employeeId: z.string().min(1, 'Employee ID is required'),
   name: z.string().min(2, 'Full name is required'),
@@ -38,14 +38,25 @@ export default function StepEmployee({ defaultValues, onNext, onBack }: Props) {
   const { verifier } = useAuth();
   const isBgvAgency = verifier?.isBgvAgency ?? false;
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues,
   });
 
   const onSubmit = async (data: FormData) => {
+    // Conditional required-field checks (Zod schema keeps them optional to avoid hidden-field failures)
+    if (isBgvAgency && !data.verifyingForCompany) {
+      setError('verifyingForCompany', { message: 'Select a company' });
+      return;
+    }
+    if (!isBgvAgency && !data.entityName) {
+      setError('entityName', { message: 'Select an entity' });
+      return;
+    }
+
+    const entityName = isBgvAgency ? (data.verifyingForCompany ?? '') : (data.entityName ?? '');
+
     try {
-      const entityName = isBgvAgency ? (data.verifyingForCompany ?? '') : data.entityName;
       const result = await validateEmployee({
         employeeId: data.employeeId.trim(),
         name: data.name.trim(),
