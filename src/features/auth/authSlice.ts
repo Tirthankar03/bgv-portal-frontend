@@ -36,7 +36,8 @@ const authSlice = createSlice({
       state.token = token;
       state.admin = admin;
       state.verifier = null;
-      state.role = admin.role as UserRole;
+      // Use the JWT claim (backend normalizes it via toUpperCase) to avoid raw DB value case mismatches
+      state.role = (decoded?.role ?? admin.role) as UserRole;
       state.expiresAt = decoded?.exp ?? null;
       state.pendingOtpEmail = null;
     },

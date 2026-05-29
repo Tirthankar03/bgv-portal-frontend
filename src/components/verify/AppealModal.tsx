@@ -71,15 +71,9 @@ export default function AppealModal({ isOpen, onClose, verificationId, mismatche
               {mismatchedFields.filter((f) => !f.isMatch).map((f) => (
                 <div key={f.field} className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs">
                   <p className="font-medium text-gray-700 capitalize">{f.field.replace(/([A-Z])/g, ' $1')}</p>
-                  <div className="mt-1 grid grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-gray-400">Submitted: </span>
-                      <span className="text-gray-900">{f.verifierValue || '—'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400">Official: </span>
-                      <span className="text-gray-900">{f.companyValue || '—'}</span>
-                    </div>
+                  <div className="mt-1">
+                    <span className="text-gray-400">Submitted: </span>
+                    <span className="text-gray-900">{f.verifierValue || '—'}</span>
                   </div>
                 </div>
               ))}
