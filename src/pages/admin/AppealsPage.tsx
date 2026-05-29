@@ -1,30 +1,54 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { getAppeals } from '@/features/appeals/appealsApi';
 import { formatDateTime } from '@/utils/date';
 import { clsx } from 'clsx';
-import { ChevronRight, ChevronLeft, Search } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Search, MessageSquare } from 'lucide-react';
 
-const STATUS_TABS = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const;
+// Backend stores status as lowercase: "pending" | "completed"
+const STATUS_TABS = ['ALL', 'PENDING', 'COMPLETED'] as const;
 type StatusFilter = typeof STATUS_TABS[number];
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === 'PENDING') return <span className="badge-warning">Pending</span>;
-  if (status === 'APPROVED') return <span className="badge-success">Approved</span>;
-  if (status === 'REJECTED') return <span className="badge-danger">Rejected</span>;
+  const s = status?.toLowerCase();
+  if (s === 'pending') return <span className="badge-danger">Pending</span>;
+  if (s === 'completed') return <span className="badge-success">Completed</span>;
   return <span className="badge-gray">{status}</span>;
 }
 
 export default function AppealsPage() {
   const navigate = useNavigate();
-  const [status, setStatus] = useState<StatusFilter>('ALL');
+  const [activeTab, setActiveTab] = useState<StatusFilter>('ALL');
   const [page, setPage] = useState(0);
+  const [search, setSearch] = useState('');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['appeals', status, page],
-    queryFn: () => getAppeals({ status: status === 'ALL' ? undefined : status, page, size: 20 }),
+    queryKey: ['appeals', activeTab, page],
+    queryFn: () => getAppeals({
+      status: activeTab === 'ALL' ? undefined : activeTab.toLowerCase(),
+      page,
+      size: 20,
+    }),
   });
+
+  // Client-side search across the loaded page
+  const filtered = useMemo(() => {
+    if (!data?.content || !search.trim()) return data?.content ?? [];
+    const q = search.trim().toLowerCase();
+    return data.content.filter((a) =>
+      a.appealId.toLowerCase().includes(q) ||
+      a.employeeId.toLowerCase().includes(q) ||
+      (a.employee?.name ?? '').toLowerCase().includes(q) ||
+      (a.verifier?.companyName ?? '').toLowerCase().includes(q)
+    );
+  }, [data?.content, search]);
+
+  const handleTabChange = (tab: StatusFilter) => {
+    setActiveTab(tab);
+    setPage(0);
+    setSearch('');
+  };
 
   return (
     <div className="space-y-6">
@@ -33,22 +57,35 @@ export default function AppealsPage() {
         <p className="text-sm text-gray-500 mt-0.5">Review and respond to verifier queries</p>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
-        {STATUS_TABS.map((s) => (
-          <button
-            key={s}
-            onClick={() => { setStatus(s); setPage(0); }}
-            className={clsx(
-              'rounded-md px-4 py-1.5 text-sm font-medium transition-all',
-              status === s
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
-            )}
-          >
-            {s.charAt(0) + s.slice(1).toLowerCase()}
-          </button>
-        ))}
+      {/* Status filter tabs + search */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="flex gap-1 rounded-lg bg-gray-100 p-1 w-fit">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => handleTabChange(tab)}
+              className={clsx(
+                'rounded-md px-4 py-1.5 text-sm font-medium transition-all',
+                activeTab === tab
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              {tab === 'ALL' ? 'All' : tab.charAt(0) + tab.slice(1).toLowerCase()}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by ID, employee, verifier…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="field-input pl-9"
+          />
+        </div>
       </div>
 
       {/* Table */}
@@ -59,10 +96,11 @@ export default function AppealsPage() {
               <div key={i} className="h-16 skeleton m-4 rounded-lg" />
             ))}
           </div>
-        ) : !data?.content.length ? (
+        ) : !filtered.length ? (
           <div className="flex flex-col items-center py-16 text-gray-400">
-            <Search className="h-10 w-10 mb-3" />
+            <MessageSquare className="h-10 w-10 mb-3" />
             <p className="font-medium">No appeals found</p>
+            {search && <p className="text-sm mt-1">Try clearing the search filter</p>}
           </div>
         ) : (
           <>
@@ -74,12 +112,12 @@ export default function AppealsPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Employee</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Verifier</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Submitted</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {data.content.map((appeal) => (
+                {filtered.map((appeal) => (
                   <tr
                     key={appeal.id}
                     onClick={() => navigate(`/admin/appeals/${appeal.appealId}`)}
@@ -87,12 +125,12 @@ export default function AppealsPage() {
                   >
                     <td className="px-4 py-3 text-sm font-mono font-medium text-gray-900">{appeal.appealId}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">
-                      <p>{appeal.employee?.name}</p>
-                      <p className="text-xs text-gray-400">{appeal.employeeId}</p>
+                      <p className="font-medium">{appeal.employee?.name ?? '—'}</p>
+                      <p className="text-xs text-gray-400 font-mono">{appeal.employeeId}</p>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{appeal.verifier?.companyName}</td>
+                    <td className="px-4 py-3 text-sm text-gray-700">{appeal.verifier?.companyName ?? '—'}</td>
                     <td className="px-4 py-3"><StatusBadge status={appeal.status} /></td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{formatDateTime(appeal.createdAt)}</td>
+                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{formatDateTime(appeal.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <ChevronRight className="h-4 w-4 text-gray-400" />
                     </td>
@@ -103,7 +141,7 @@ export default function AppealsPage() {
 
             {/* Mobile cards */}
             <div className="divide-y divide-gray-100 sm:hidden">
-              {data.content.map((appeal) => (
+              {filtered.map((appeal) => (
                 <button
                   key={appeal.id}
                   onClick={() => navigate(`/admin/appeals/${appeal.appealId}`)}
@@ -114,7 +152,7 @@ export default function AppealsPage() {
                       <span className="font-mono text-sm font-medium text-gray-900">{appeal.appealId}</span>
                       <StatusBadge status={appeal.status} />
                     </div>
-                    <p className="text-sm text-gray-700 truncate">{appeal.employee?.name}</p>
+                    <p className="text-sm text-gray-700 truncate">{appeal.employee?.name ?? '—'}</p>
                     <p className="text-xs text-gray-400">{appeal.verifier?.companyName} · {formatDateTime(appeal.createdAt)}</p>
                   </div>
                   <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
@@ -126,27 +164,30 @@ export default function AppealsPage() {
       </div>
 
       {/* Pagination */}
-      {data && data.totalPages > 1 && (
+      {data && data.totalPages > 0 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-500">
-            Page {data.number + 1} of {data.totalPages} ({data.totalElements} total)
+            Showing {filtered.length} of {data.totalElements} appeal{data.totalElements !== 1 ? 's' : ''}
+            {data.totalPages > 1 && ` · Page ${data.number + 1} of ${data.totalPages}`}
           </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="btn-ghost p-2"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(data.totalPages - 1, p + 1))}
-              disabled={page >= data.totalPages - 1}
-              className="btn-ghost p-2"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+          {data.totalPages > 1 && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+                className="btn-ghost p-2 disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setPage((p) => Math.min(data.totalPages - 1, p + 1))}
+                disabled={page >= data.totalPages - 1}
+                className="btn-ghost p-2 disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

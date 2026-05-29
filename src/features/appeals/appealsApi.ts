@@ -37,7 +37,7 @@ export interface Appeal {
   verificationId: number;
   employeeId: string;
   appealReason: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'pending' | 'completed';
   hrResponse: string | null;
   hrComments: string | null;
   reviewedBy: string | null;

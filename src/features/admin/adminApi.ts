@@ -24,12 +24,16 @@ export interface ActivityItem {
 }
 
 export interface BlockedVerifier {
+  id: number;              // VerificationAttempt.id — used for unblock
   verifierId: number;
-  email: string;
-  companyName: string;
+  verifierEmail: string;
+  verifierCompanyName: string;
   employeeId: string;
+  employeeName: string;
   attemptCount: number;
+  isBlocked: boolean;
   blockedAt: string;
+  lastAttemptAt: string;
 }
 
 export interface AccessLog {
@@ -41,6 +45,7 @@ export interface AccessLog {
   ipAddress: string;
   userAgent: string;
   failureReason: string | null;
+  metadata: string | null;
   timestamp: string;
 }
 
@@ -64,7 +69,11 @@ export async function getBlockedVerifiers(): Promise<BlockedVerifier[]> {
   return res.data;
 }
 
-export async function getAccessLogs(params?: { status?: string; role?: string; page?: number; size?: number }): Promise<PagedResponse<AccessLog>> {
+export async function unblockAttempt(attemptId: number): Promise<void> {
+  await api.delete(`/api/admin/blocked/${attemptId}`);
+}
+
+export async function getAccessLogs(params?: { status?: string; role?: string; email?: string; page?: number; size?: number }): Promise<PagedResponse<AccessLog>> {
   const res = await api.get<PagedResponse<AccessLog>>('/api/admin/logs', { params });
   return res.data;
 }
