@@ -60,7 +60,7 @@ export default function StepEmployee({ defaultValues, onNext, onBack }: Props) {
       const result = await validateEmployee({
         employeeId: data.employeeId.trim(),
         name: data.name.trim(),
-        entityName: entityName || undefined,
+        entityName,
       });
       if (!result.found) {
         toast.error(result.message || 'Employee not found or name mismatch');
